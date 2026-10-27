@@ -19,12 +19,12 @@ func main() {
 	swint := flag.String("swint", "", "legacy or 8125")
 	rings := flag.Bool("rings", false, "program descriptor bases, leave RX/TX disabled")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "uso: R8169VFIO_ALLOW_HARDWARE=1 %s <grupo> <bdf> [-swint legacy|8125] [-rings]\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "sin la variable de entorno no se abre /dev/vfio.\n")
+		fmt.Fprintf(os.Stderr, "usage: R8169VFIO_ALLOW_HARDWARE=1 %s <group> <bdf> [-swint legacy|8125] [-rings]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "without that environment variable, /dev/vfio is not opened.\n")
 	}
 	flag.Parse()
 	if os.Getenv("R8169VFIO_ALLOW_HARDWARE") != "1" {
-		fmt.Fprintln(os.Stderr, "rechazado: exporta R8169VFIO_ALLOW_HARDWARE=1 solo dentro de una VM de pruebas")
+		fmt.Fprintln(os.Stderr, "refused: set R8169VFIO_ALLOW_HARDWARE=1 only inside a test VM")
 		os.Exit(2)
 	}
 	if flag.NArg() != 2 {
@@ -35,7 +35,7 @@ func main() {
 	if *swint == "8125" {
 		family = vfio.Family8125
 	} else if *swint != "" && *swint != "legacy" {
-		fmt.Fprintln(os.Stderr, "-swint espera legacy o 8125")
+		fmt.Fprintln(os.Stderr, "-swint expects legacy or 8125")
 		os.Exit(2)
 	}
 	dev, err := vfio.Attach(vfio.Linux(), flag.Arg(0), flag.Arg(1), family)
@@ -51,7 +51,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		fmt.Println("anillos programados, motores RX/TX apagados")
+		fmt.Println("rings programmed, RX/TX engines left disabled")
 	}
 	if *swint == "" {
 		return
@@ -73,7 +73,7 @@ func main() {
 			fmt.Printf("IntrStatus %#x\n", dev.AckLegacy())
 		}
 	case <-ctx.Done():
-		fmt.Fprintln(os.Stderr, "timeout esperando el eventfd")
+		fmt.Fprintln(os.Stderr, "timed out waiting for the eventfd")
 		os.Exit(1)
 	}
 }
