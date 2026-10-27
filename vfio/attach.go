@@ -71,14 +71,19 @@ type Device struct {
 	dma       []byte
 	iova      uint64
 	cfgOff    int64
+	mmio      MMIO
 	irq       int
 	irqFile   *os.File
+	irqBuf    [8]byte
 	irqIndex  uint32
 	automask  bool
-	huge      bool
-	locked    bool
-	xid       uint32
-	txconfig  uint32
+	intxSet   struct {
+		Argsz, Flags, Index, Start, Count uint32
+	}
+	huge     bool
+	locked   bool
+	xid      uint32
+	txconfig uint32
 }
 
 // Attach opens the group, maps the first mmapable memory BAR, enables memory
@@ -202,6 +207,7 @@ func (d *Device) findBAR(nreg uint32) (regionInfo, error) {
 			return regionInfo{}, fmt.Errorf("vfio: mmap BAR%d: %w", i, err)
 		}
 		d.bar = buf
+		d.mmio.b = buf
 		var cfg regionInfo
 		cfg.Argsz = uint32(unsafe.Sizeof(cfg))
 		cfg.Index = pciConfigRegion
@@ -332,14 +338,12 @@ func irqOrder(f Family) []uint32 {
 
 func (d *Device) unmaskINTX() error {
 	// vfio_irq_set with DATA_NONE stops at Count. That prefix is 20 bytes.
-	var hdr struct {
-		Argsz, Flags, Index, Start, Count uint32
-	}
-	hdr.Argsz = uint32(unsafe.Sizeof(hdr))
-	hdr.Flags = irqDataNone | irqActionUnmask
-	hdr.Index = irqINTX
-	hdr.Count = 1
-	_, err := d.sys.IoctlPtr(d.dev, reqSetIRQs, unsafe.Pointer(&hdr))
+	// The header lives on Device: a stack copy would escape through IoctlPtr.
+	d.intxSet.Argsz = uint32(unsafe.Sizeof(d.intxSet))
+	d.intxSet.Flags = irqDataNone | irqActionUnmask
+	d.intxSet.Index = irqINTX
+	d.intxSet.Count = 1
+	_, err := d.sys.IoctlPtr(d.dev, reqSetIRQs, unsafe.Pointer(&d.intxSet))
 	return err
 }
 
@@ -359,6 +363,7 @@ func (d *Device) Close() error {
 	if d.bar != nil {
 		remember(d.sys.Munmap(d.bar))
 		d.bar = nil
+		d.mmio.b = nil
 	}
 	if d.irqFile != nil {
 		remember(d.irqFile.Close())
@@ -406,7 +411,7 @@ func (d *Device) Huge() bool { return d.huge }
 func (d *Device) Locked() bool { return d.locked }
 
 // MMIO is the mapped BAR. Register offsets are byte offsets into this window.
-func (d *Device) MMIO() MMIO { return sliceMMIO{d.bar} }
+func (d *Device) MMIO() *MMIO { return &d.mmio }
 
 // DMABuf is the pinned window whose byte 0 is at IOVA().
 func (d *Device) DMABuf() []byte { return d.dma }

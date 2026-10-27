@@ -8,7 +8,7 @@ The DMA window is 8 MiB. When hugepages are available the mapping uses `MAP_HUGE
 
 The interrupt is an `eventfd` created with `EFD_NONBLOCK` and wrapped in `os.NewFile`. `WatchIRQ` reads 8 bytes from a goroutine. `FamilyLegacy` tries INTx, MSI, and MSI-X, in that order. `Family8125` tries MSI-X, MSI, and INTx. After each INTx event the code sends `VFIO_IRQ_SET_ACTION_UNMASK`. `ArmLegacySWInt` sets the `SWInt` mask (`0x0100`) and writes `0x01` to `TxPoll` (`0x38`). `Arm8125` sets bit 0 of `INT_CFG0` (`0x34`) and the link-change mask (bit 29) at `0x38`.
 
-MMIO accesses are loads and stores of the register width (`8`, `16`, or `32` bits) on the slice returned by `mmap`.
+MMIO accesses are loads and stores of the register width (`8`, `16`, or `32` bits) on the slice returned by `mmap`. `MMIO()` returns a pointer to a field of `Device`. `ProgramRings`, `Arm*`, `Ack*`, and each `WatchIRQ` delivery do not allocate.
 
 `NewFake` implements the same syscall interface in memory. Package tests use that backend. `Linux()` uses `golang.org/x/sys/unix`.
 
